@@ -1,0 +1,69 @@
+org: leonardomontesinos
+service: api-seguridad-utec
+
+provider:
+  name: aws
+  runtime: nodejs20.x
+  region: us-east-1
+  memorySize: 256
+  timeout: 30 # Requerido: 30 segundos según PDF 
+  
+  # IMPORTANTE: Configuración para AWS Academy
+  # Usamos el rol predefinido LabRole para evitar errores de permisos IAM al desplegar.
+  iam:
+    role: arn:aws:iam::088462649389:role/LabRole
+    
+  environment:
+    USERS_TABLE: t_usuarios
+    TOKENS_TABLE: t_tokens_acceso
+    JWT_SECRET: "ab7dde33d5bdb1ba1cff98760841e8ef"
+
+functions:
+  # Lambda 1: CrearUsuario
+  # Necesaria para registrar usuarios antes de poder iniciar sesión
+  CrearUsuario:
+    handler: registro.handler
+    events:
+      - http:
+          path: /usuarios/crear
+          method: post
+          cors: true
+
+  # Lambda 2: LoginUsuario
+  # Valida credenciales y genera el token de sesión
+  LoginUsuario:
+    handler: login.handler
+    events:
+      - http:
+          path: /usuarios/login
+          method: post
+          cors: true
+
+# Recursos: Solo creamos las tablas necesarias para el login
+resources:
+  Resources:
+    # Tabla: t_usuarios (Partition Key: user_id)
+    UsuariosTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: t_usuarios
+        AttributeDefinitions:
+          - AttributeName: user_id
+            AttributeType: S
+        KeySchema:
+          - AttributeName: user_id
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
+
+    # Tabla: t_tokens_acceso (Partition Key: token)
+    TokensTable:
+      Type: AWS::DynamoDB::Table
+      Properties:
+        TableName: t_tokens_acceso
+        AttributeDefinitions:
+          - AttributeName: token
+            AttributeType: S
+        KeySchema:
+          - AttributeName: token
+            KeyType: HASH
+        BillingMode: PAY_PER_REQUEST
